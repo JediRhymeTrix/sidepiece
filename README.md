@@ -30,7 +30,7 @@ Those measurements describe the predecessor on one Windows machine, **not a benc
 ## Install in a few clicks
 **Requires:** Windows x64, NVIDIA App installed and opened at least once, administrator access, and free loopback port 80. Releases are **experimental and unsigned**; verify the checksum before running. No signing or SmartScreen reputation is claimed.
 
-1. Download **`Sidepiece-Setup-0.2.1-windows-x64.exe`** and `SHA256SUMS.txt` from [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <downloaded-exe> -Algorithm SHA256` with its entry.
+1. Download **`Sidepiece-Setup-0.2.2-windows-x64.exe`** and `SHA256SUMS.txt` from [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <downloaded-exe> -Algorithm SHA256` with its entry.
 2. Run the installer and approve elevation. The configuration window shows NVIDIA GPU names, suggested metadata IDs and device state—including disabled GPUs.
 3. Select your **external desktop GPU**, click **Allow selected GPU**, and review the editable ID. Optionally deny your internal laptop GPU. Nothing is selected automatically: a GPU name cannot establish enclosure topology, and the suggested `_1` suffix may need correction. [GPU selection details](docs/configuration.md#selecting-a-gpu).
 4. Click **Install and verify**, confirm your selection, then reopen NVIDIA App and check driver discovery.

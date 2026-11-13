@@ -6,11 +6,12 @@ param(
  [string[]]$DeniedDeviceId=@(),
  [string]$ConfigText,
  [string]$ExpectedConfigHash,
- [string]$BinaryPath=(Join-Path (Split-Path $PSScriptRoot -Parent) 'sidepiece.exe'),
+ [string]$BinaryPath,
  [string]$InstallRoot=(Join-Path $env:ProgramFiles 'GeForce Sidepiece'),
  [string]$DataRoot=(Join-Path $env:ProgramData 'GeForceSidepiece')
 )
 $ErrorActionPreference='Stop'
+if(-not $BinaryPath){$BinaryPath=Join-Path (Split-Path $PSScriptRoot -Parent) 'sidepiece.exe'}
 $name='GeForceSidepiece'
 function Assert-Admin {
  $identity=[Security.Principal.WindowsIdentity]::GetCurrent()

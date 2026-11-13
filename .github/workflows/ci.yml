@@ -52,7 +52,7 @@ jobs:
         run: ./scripts/Build-Installer.ps1 -InstallCompiler
       - name: Configurator UI construction smoke test
         shell: powershell
-        run: ./scripts/Configure.ps1 -Install -SmokeTest
+        run: powershell.exe -NoProfile -STA -File ./scripts/Configure.ps1 -Install -SmokeTest
       - name: Compiled installer lifecycle
         shell: powershell
         run: ./scripts/Test-Installer.ps1
