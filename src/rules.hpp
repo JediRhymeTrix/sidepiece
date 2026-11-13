@@ -55,6 +55,8 @@ static Rules parseRules(const string &b) {
               {"schemaVersion", "enabled", "whitelistDeviceIds", "blacklistDeviceIds",
                "whitelistEndpoints", "blacklistEndpoints", "rules"});
     bool versioned = j.n[0].obj.count("schemaVersion") != 0;
+    require(versioned || j.n[0].obj.count("rules") == 0,
+            "rules require schemaVersion");
     if (versioned) {
         int v = j.member(0, "schemaVersion");
         require(j.n[v].type == '0' && j.n[v].text == "1", "unsupported schema version");

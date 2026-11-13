@@ -22,7 +22,10 @@ int wmain() {
         check(!rewrite(original, rules));
         for (
             string bad :
-            {string(R"({"schemaVersion":2,"rules":[]})"),
+            {string(R"({"rules":false})"),
+             string(R"({"rules":[]})"),
+             string(R"({"schemaVersion":1,"rules":false})"),
+             string(R"({"schemaVersion":2,"rules":[]})"),
              string(
                  R"({"schemaVersion":1,"rules":[{"endpoint":"x","method":"POST","overrides":[]}]})"),
              string(
