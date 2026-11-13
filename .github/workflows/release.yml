@@ -31,9 +31,12 @@ jobs:
       - run: ./scripts/Test-Gpu.ps1
       - run: ./scripts/Package.ps1
       - run: ./scripts/Build-Installer.ps1 -InstallCompiler
-      - name: Configurator UI construction smoke test
+      - name: Configurator shown-window and session lifecycle
         shell: powershell
-        run: powershell.exe -NoProfile -STA -File ./scripts/Configure.ps1 -Install -SmokeTest
+        run: powershell.exe -NoProfile -STA -File ./scripts/Test-Ui.ps1
+      - name: Extracted package verification
+        shell: powershell
+        run: powershell.exe -NoProfile -STA -File ./scripts/Test-Package.ps1
       - shell: powershell
         run: ./scripts/Test-Installer.ps1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4

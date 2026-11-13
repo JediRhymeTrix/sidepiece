@@ -12,6 +12,8 @@ Stop through `Stop-Service GeForceSidepiece`. Restore occurs before shutdown is 
 ## Installer and on-demand configuration
 The installer adds a Start-menu configurator and Installed Apps entry. Run a newer EXE to upgrade; custom rules survive. Uninstall restores owned NVIDIA URLs before removing installer-managed support files, retaining service binaries and recovery data. It refuses unrelated installations instead of migrating them. Silent first installation requires `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /GPU=ABCD_10DE_1234_5678_1` with a real explicit metadata ID; multiple IDs are comma-separated. Silent upgrades preserve the existing selection.
 
+Interactive setup and the Start shortcut use normal window presentation; a PowerShell console may appear briefly. Close an existing configuration session before starting another setup/configurator. Installer-owned selection UI cancels when its validated parent exits; an already-started service transaction finishes or unwinds rather than being forcibly killed. This does not make forced termination or power loss transactional.
+
 For a script-installed service, launch the portable UI elevated with ` .\scripts\Configure.ps1 -InstallRoot 'C:\Program Files\GeForce Sidepiece'`. For installer-managed backend commands, supply `-InstallRoot 'C:\Program Files\GeForce Sidepiece\service'`. Do not interchange these layouts.
 
 `Configure` accepts full `-ConfigText` and the loaded file's SHA-256 as `-ExpectedConfigHash`; stale or invalid saves are refused. `-DeniedDeviceId` sets the initial deny list. Basic UI edits retain custom rules; Advanced JSON exposes the full configuration. Saving does not start a stopped service.

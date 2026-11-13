@@ -4,10 +4,15 @@ param(
  [Parameter(Mandatory=$true)][string]$InstallRoot,
  [string]$DataRoot=(Join-Path $env:ProgramData 'GeForceSidepiece'),
  [string]$DeviceIds,
- [switch]$Silent
+ [switch]$Silent,
+ [long]$OwnerWindow,
+ [int]$OwnerProcessId
 )
 $ErrorActionPreference='Stop'
+. (Join-Path $PSScriptRoot 'UiSession.ps1')
+$session=$null
 try{
+ $session=Open-SidepieceUiSession $OwnerWindow $OwnerProcessId
  $serviceRoot=Join-Path $InstallRoot 'service'
  $backend=Join-Path $PSScriptRoot 'Setup.ps1'
  if($Action -eq 'Uninstall'){
@@ -22,14 +27,18 @@ try{
   $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,80)
   try{$listener.Start()}catch{throw 'Port 80 is occupied. Stop/restore the existing bridge through its manager first; setup will not take it over.'}finally{$listener.Stop()}
   if(Test-Path -LiteralPath $DataRoot){throw 'Existing recovery data found. Refusing to adopt or overwrite it. Review/archive it first.'}
-  $options=@{Install=$true;InstallRoot=$serviceRoot;DataRoot=$DataRoot}
+  $options=@{Install=$true;InstallRoot=$serviceRoot;DataRoot=$DataRoot;OwnerWindow=$OwnerWindow;OwnerProcessId=$OwnerProcessId}
   if($DeviceIds){$options.SilentDeviceIds=$DeviceIds}
   & (Join-Path $PSScriptRoot 'Configure.ps1') @options
   if($LASTEXITCODE -or -not (Get-Service GeForceSidepiece -ErrorAction SilentlyContinue)){throw 'GPU selection cancelled or service installation failed.'}
  }
  exit 0
 }catch{
- if(-not $Silent){Add-Type -AssemblyName System.Windows.Forms;[void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'GeForce Sidepiece - setup refused','OK','Error')}
+ if(-not $Silent -and (-not $session -or -not $session.Parent -or -not $session.Parent.HasExited)){
+  Add-Type -AssemblyName System.Windows.Forms
+  if($session -and $session.Owner){[void][Windows.Forms.MessageBox]::Show($session.Owner,$_.Exception.Message,'GeForce Sidepiece - setup refused','OK','Error')}
+  else{[void][Windows.Forms.MessageBox]::Show($_.Exception.Message,'GeForce Sidepiece - setup refused','OK','Error')}
+ }
  Write-Error $_ -ErrorAction Continue
  exit 1
-}
+}finally{Close-SidepieceUiSession $session}

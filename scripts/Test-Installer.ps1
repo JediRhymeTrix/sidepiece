@@ -34,7 +34,8 @@ try{
  if(-not (Test-Path $recovery)){throw 'Protected recovery helper missing'}
  $shortcut=Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Configure GeForce Sidepiece.lnk'
  $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
- if($link.Arguments -notlike '*payload\scripts\Configure.ps1*' -or $link.Arguments -notlike '*-STA*'){throw 'Installed shortcut target invalid'}
+ if($link.Arguments -notlike '*payload\scripts\Configure.ps1*' -or $link.Arguments -notlike '*-STA*' -or $link.Arguments -match '-WindowStyle\s+Hidden' -or $link.WindowStyle -eq 7){throw 'Installed shortcut target/presentation invalid'}
+ & (Join-Path $PSScriptRoot 'Test-Ui.ps1') -ConfigurePath (Join-Path $install 'payload\scripts\Configure.ps1')
  $config=Join-Path $data 'config.json'
  $before=[IO.File]::ReadAllText($config);$hash=(Get-FileHash $config -Algorithm SHA256).Hash
  $rejected=$false

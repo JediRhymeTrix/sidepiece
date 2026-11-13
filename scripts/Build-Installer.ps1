@@ -25,7 +25,7 @@ Copy-Item -LiteralPath (Join-Path $root 'build\sidepiece.exe') -Destination $pay
 foreach($file in 'LICENSE','README.md','SECURITY.md','VERSION'){Copy-Item -LiteralPath (Join-Path $root $file) -Destination $payload}
 Copy-Item -LiteralPath (Join-Path $root 'config') -Destination $payload -Recurse
 New-Item -ItemType Directory -Path (Join-Path $payload 'scripts')|Out-Null
-foreach($file in 'Setup.ps1','Gpu.ps1','Configure.ps1','Installer.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $payload 'scripts')}
+foreach($file in 'Setup.ps1','Gpu.ps1','Configure.ps1','Installer.ps1','UiSession.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $payload 'scripts')}
 & $compiler ('/DProductVersion='+$version) (Join-Path $root 'installer\sidepiece.iss')
 if($LASTEXITCODE){throw 'Installer compilation failed'}
 if($env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted'){

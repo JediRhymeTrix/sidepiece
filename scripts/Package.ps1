@@ -12,14 +12,14 @@ try{
  foreach($file in 'README.md','LICENSE','SECURITY.md','CONTRIBUTING.md','VERSION'){Copy-Item -LiteralPath (Join-Path $root $file) -Destination $stage}
  foreach($dir in 'config','docs','assets'){Copy-Item -LiteralPath (Join-Path $root $dir) -Destination $stage -Recurse}
  New-Item -ItemType Directory -Path (Join-Path $stage 'scripts')|Out-Null
- foreach($script in 'Setup.ps1','Gpu.ps1','Configure.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $stage ('scripts\'+$script))}
+ foreach($script in 'Setup.ps1','Gpu.ps1','Configure.ps1','UiSession.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $script) -Destination (Join-Path $stage ('scripts\'+$script))}
  $zip=Join-Path $dist ('sidepiece-'+$version+'-windows-x64.zip')
  Compress-Archive -Path (Join-Path $stage '*') -DestinationPath $zip -Force
  Add-Type -AssemblyName System.IO.Compression.FileSystem
  $archive=[IO.Compression.ZipFile]::OpenRead($zip)
  try{
   $names=@($archive.Entries|ForEach-Object {$_.FullName.Replace('\','/')})
-  foreach($script in 'Setup.ps1','Gpu.ps1','Configure.ps1'){if($names -notcontains ('scripts/'+$script)){throw ('Missing portable helper: '+$script)}}
+  foreach($script in 'Setup.ps1','Gpu.ps1','Configure.ps1','UiSession.ps1'){if($names -notcontains ('scripts/'+$script)){throw ('Missing portable helper: '+$script)}}
  }finally{$archive.Dispose()}
  $sum=(Get-FileHash -LiteralPath $zip -Algorithm SHA256).Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($zip)
  [IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'),$sum+"`n",[Text.UTF8Encoding]::new($false))
