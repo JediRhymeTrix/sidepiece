@@ -28,12 +28,20 @@ jobs:
       - shell: powershell
         run: ./scripts/Test-Setup.ps1
       - run: ./scripts/Test-Setup.ps1
+      - run: ./scripts/Test-Gpu.ps1
       - run: ./scripts/Package.ps1
+      - run: ./scripts/Build-Installer.ps1 -InstallCompiler
+      - name: Configurator UI construction smoke test
+        shell: powershell
+        run: ./scripts/Configure.ps1 -Install -SmokeTest
+      - shell: powershell
+        run: ./scripts/Test-Installer.ps1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: release-windows-x64
           path: |
             dist/*.zip
+            dist/*.exe
             dist/SHA256SUMS.txt
           if-no-files-found: error
   publish:
@@ -58,4 +66,4 @@ jobs:
           printf '%s\n' 'Unofficial NVIDIA App desktop-eGPU metadata bridge.' '' 'Unsigned Windows x64 binaries. All 0.x releases are experimental prereleases. Synthetic/native SCM testing does not establish NVIDIA App GUI or broad hardware compatibility. See README and SECURITY.md before installation.' > "$RUNNER_TEMP/release-notes.txt"
           options=()
           if [[ "$RELEASE_TAG" == v0.* ]]; then options+=(--prerelease); fi
-          gh release create "$RELEASE_TAG" ./*.zip SHA256SUMS.txt --verify-tag --title "GeForce Sidepiece $RELEASE_TAG" --generate-notes --notes-file "$RUNNER_TEMP/release-notes.txt" "${options[@]}"
+          gh release create "$RELEASE_TAG" ./*.zip ./*.exe SHA256SUMS.txt --verify-tag --title "GeForce Sidepiece $RELEASE_TAG" --generate-notes --notes-file "$RUNNER_TEMP/release-notes.txt" "${options[@]}"

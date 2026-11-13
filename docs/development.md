@@ -9,6 +9,11 @@ The initial suite contains 82 parser/routing checks, 66 HTTP integration checks 
 
 Format C++ with the checked-in `.clang-format`. PowerShell scripts target Windows PowerShell 5.1 and PowerShell 7. Keep native arguments explicitly quoted where paths contain spaces; check actual native exit codes rather than relying on `$ErrorActionPreference` alone.
 
+## Installer and configuration checks
+Run `scripts/Test-Gpu.ps1` for PCI conversion and disabled-device inventory checks. Windows PowerShell 5.1 with `-STA` can run `scripts/Configure.ps1 -Install -SmokeTest` to construct and synchronize the real form without displaying it or changing services. This is not interactive click-through or hardware certification.
+
+After `scripts/Package.ps1`, run `scripts/Build-Installer.ps1` with Inno Setup **6.4.3** installed. CI uses `-InstallCompiler` to provision the pinned compiler on a disposable runner. The installer payload is an explicit allowlist, separate from the running service binary. `scripts/Test-Installer.ps1` is restricted to clean GitHub-hosted Windows runners: it creates synthetic NVIDIA settings and tests the compiled EXE's install/configure/upgrade/uninstall lifecycle. It temporarily stops runner IIS to free port 80. Never run it on a workstation.
+
 ## Source map
 - `src/platform.hpp`: Win32 RAII, text/file helpers and fixed redacted diagnostics.
 - `src/json.hpp`: bounded strict JSON parser with original byte spans.
