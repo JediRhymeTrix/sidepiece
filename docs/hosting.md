@@ -1,13 +1,20 @@
 # Hosting and recovery
 
 ## Standalone Windows service
-Setup registers `GeForceSidepiece` for automatic startup under LocalService plus its own service SID. Runtime needs no pdsvc dependency, resident script or wrapper. Default executable: `C:\Program Files\GeForce Sidepiece\sidepiece.exe`; private data: `C:\ProgramData\GeForceSidepiece`.
+Setup registers `GeForceSidepiece` for automatic startup under LocalService plus its own service SID. Runtime needs no pdsvc dependency, resident script or wrapper. The EXE installer uses `C:\Program Files\GeForce Sidepiece\service\sidepiece.exe`, with GUI/support files under `payload`. Scripted ZIP setup defaults to `C:\Program Files\GeForce Sidepiece\sidepiece.exe`. Both use private data at `C:\ProgramData\GeForceSidepiece`.
 
-Run setup/control commands elevated. `Setup.ps1` supports `Install` (default), `Update`, `Uninstall`, `Status`, `ListGpus`, `-WhatIf`, `-BinaryPath`, `-InstallRoot` and `-DataRoot`. Use the same custom roots for subsequent operations. Choose trusted local, unused directories; quotes, reparse points and traversal paths are rejected. Reinstall does not overwrite retained files: after uninstall, review/archive them manually or select fresh roots.
+Run setup/control commands elevated. `Setup.ps1` supports `Install` (default), `Update`, `Uninstall`, `Status`, `ListGpus`, `Configure`, `Start`, `Stop`, `-WhatIf`, `-BinaryPath`, `-InstallRoot` and `-DataRoot`. Use the same custom roots for subsequent operations. Choose trusted local, unused directories; quotes, reparse points and traversal paths are rejected. Reinstall does not overwrite retained files: after uninstall, review/archive them manually or select fresh roots.
 
 Update requires an owned service/manifest, stops safely, preserves custom configuration and keeps `sidepiece.previous.exe` for rollback. Service-start health failures trigger rollback. Setup never force-kills a host that cannot restore its URLs. Do not invoke setup with its own installed binary as the update source.
 
 Stop through `Stop-Service GeForceSidepiece`. Restore occurs before shutdown is signaled; restoration failure is reported and the host remains running. Workers drain for at most 70 seconds while SCM checkpoints advance. Do not force termination simply because Services briefly displays Stop Pending.
+
+## Installer and on-demand configuration
+The installer adds a Start-menu configurator and Installed Apps entry. Run a newer EXE to upgrade; custom rules survive. Uninstall restores owned NVIDIA URLs before removing installer-managed support files, retaining service binaries and recovery data. It refuses unrelated installations instead of migrating them. Silent first installation requires `/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /GPU=ABCD_10DE_1234_5678_1` with a real explicit metadata ID; multiple IDs are comma-separated. Silent upgrades preserve the existing selection.
+
+For a script-installed service, launch the portable UI elevated with ` .\scripts\Configure.ps1 -InstallRoot 'C:\Program Files\GeForce Sidepiece'`. For installer-managed backend commands, supply `-InstallRoot 'C:\Program Files\GeForce Sidepiece\service'`. Do not interchange these layouts.
+
+`Configure` accepts full `-ConfigText` and the loaded file's SHA-256 as `-ExpectedConfigHash`; stale or invalid saves are refused. `-DeniedDeviceId` sets the initial deny list. Basic UI edits retain custom rules; Advanced JSON exposes the full configuration. Saving does not start a stopped service.
 
 ## Foreground / pdsvc
 The **same executable** runs in the foreground when `--service` is absent. Put it in a protected directory and create a private writable data directory, copy `config/config.example.json` there as `config.json`, and select the eGPU allowlist. Grant the chosen account access to the two NVIDIA configuration directories as needed; do not broadly relax ACLs or run a whole process manager elevated.
@@ -40,4 +47,4 @@ Backups are originals for inspection, not instructions to overwrite current file
 
 Port conflict: stop the existing owner rather than killing arbitrary processes. Access denied: inspect the service SID grants; do not switch to LocalSystem as a workaround. Rules not applying: validate config, confirm exact GPU metadata ID, endpoint and scalar type. UI stale: reopen NVIDIA App; API success is not proof the UI consumed the response.
 
-Logs: `sidepiece.log` and one `.previous` file in the data directory, roughly 1 MiB each. Logs omit URLs, headers and payloads. An abrupt process kill may leave no final diagnostic. No automatic crash-restart policy is installed in 0.1.x: investigate and restore rather than hiding persistent configuration failures.
+Logs: `sidepiece.log` and one `.previous` file in the data directory, roughly 1 MiB each. Logs omit URLs, headers and payloads. An abrupt process kill may leave no final diagnostic. No automatic crash-restart policy is installed in 0.x: investigate and restore rather than hiding persistent configuration failures.

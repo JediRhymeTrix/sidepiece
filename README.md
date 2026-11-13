@@ -25,31 +25,36 @@ This is a workaround for that specific classification issue—not a general NVID
 - Event-driven idle loop, streaming responses and at most eight concurrent clients.
 - The tested predecessor was **about 256 KiB on disk**, **3.57 MiB private memory**, and **15.45 MiB working set** after live requests; idle CPU time did not increase during a 15-second sample.
 
-Those measurements describe the predecessor on one Windows machine, **not a guaranteed v0.1.0 benchmark**. TLS caches, traffic and Windows versions affect memory. Working set is not private memory. A pdsvc/cmd/conhost wrapper adds its own overhead; the measured predecessor’s entire wrapped tree was 13.90 MiB private / 38.65 MiB working set. Native SCM hosting avoids those wrapper processes. See [measurement instructions](docs/development.md).
+Those measurements describe the predecessor on one Windows machine, **not a benchmark for the current release**. TLS caches, traffic and Windows versions affect memory. Working set is not private memory. A pdsvc/cmd/conhost wrapper adds its own overhead; the measured predecessor’s entire wrapped tree was 13.90 MiB private / 38.65 MiB working set. Native SCM hosting avoids those wrapper processes. See [measurement instructions](docs/development.md).
 
-## Quick setup
-Requires Windows x64, NVIDIA App, administrator access for setup, and free loopback port 80. Initial binaries are unsigned: verify the checksum and review the source; there is no claim of signing or SmartScreen reputation.
+## Install in a few clicks
+**Requires:** Windows x64, NVIDIA App installed and opened at least once, administrator access, and free loopback port 80. Releases are **experimental and unsigned**; verify the checksum before running. No signing or SmartScreen reputation is claimed.
 
-1. Download the Windows x64 ZIP and `SHA256SUMS.txt` from [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <zip> -Algorithm SHA256` with the checksum, then extract the ZIP.
-2. In PowerShell, run ` .\scripts\Setup.ps1 -Action ListGpus` and identify the **external desktop GPU**. [Convert its PCI hardware ID to the exact metadata ID](docs/configuration.md#selecting-a-gpu).
-3. In an elevated PowerShell window in the extracted folder, run ` .\scripts\Setup.ps1 -DeviceId 'ABCD_10DE_1234_5678_1'`, replacing the synthetic example. No device is allowlisted automatically.
-4. Reopen NVIDIA App and check driver discovery. If it still uses cached endpoints, close and reopen the app.
+1. Download **`Sidepiece-Setup-0.2.0-windows-x64.exe`** and `SHA256SUMS.txt` from [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <downloaded-exe> -Algorithm SHA256` with its entry.
+2. Run the installer and approve elevation. The configuration window shows NVIDIA GPU names, suggested metadata IDs and device state—including disabled GPUs.
+3. Select your **external desktop GPU**, click **Allow selected GPU**, and review the editable ID. Optionally deny your internal laptop GPU. Nothing is selected automatically: a GPU name cannot establish enclosure topology, and the suggested `_1` suffix may need correction. [GPU selection details](docs/configuration.md#selecting-a-gpu).
+4. Click **Install and verify**, confirm your selection, then reopen NVIDIA App and check driver discovery.
 
-Do not install alongside an existing bridge. Stop and restore its endpoints **through its current manager** before switching hosts. Setup refuses an occupied port or a foreign endpoint; do not force it.
+Setup handles service registration, permissions, endpoint redirection and a health check. The GUI closes afterward; **only the native service stays running**.
 
-## Control and recovery
-- Status: ` .\scripts\Setup.ps1 -Action Status`
-- Stop and restore official URLs: `Stop-Service GeForceSidepiece` (elevated).
-- Resume: `Start-Service GeForceSidepiece`.
-- Update from a newly extracted release: ` .\scripts\Setup.ps1 -Action Update`. Custom rules are preserved.
-- Uninstall: ` .\scripts\Setup.ps1 -Action Uninstall`. URLs are restored; configuration, backups and binaries are retained for recovery.
+> Already using a bridge? Do not install alongside it. Stop and restore its endpoints **through its current manager** first. Setup refuses foreign installations, occupied port 80 and retained recovery data; it does not migrate or take over pdsvc.
+
+### Prefer scripts or a portable host?
+Download and extract the ZIP instead. In an elevated PowerShell window, run ` .\scripts\Setup.ps1 -Action ListGpus`, then ` .\scripts\Setup.ps1 -DeviceId 'ABCD_10DE_1234_5678_1'` with your exact metadata ID. The example is synthetic. [SCM and foreground/pdsvc instructions](docs/hosting.md).
+
+## Configure, update or remove
+- **Configure:** open **Configure GeForce Sidepiece** from Start. Edit allow/deny lists, toggle overrides, or use **Advanced JSON** for custom rules. Saves validate before replacing configuration and preserve running/stopped state.
+- **Stop and restore / Start service:** use the configurator buttons. Disabling metadata overrides is not the same as stopping the bridge.
+- **Update:** run the newer installer. Custom rules are preserved. Script-installed services must use `Setup.ps1 -Action Update` instead; installation layouts are not silently converted.
+- **Uninstall:** use Windows **Installed Apps**. URL restoration must succeed before UI files are removed. Service binaries, configuration, route key and backups remain for recovery; review/archive them before reinstalling.
+- **Scripted setup:** `Setup.ps1 -Action Status`, `-Action Stop`, `-Action Start`, `-Action Update` and `-Action Uninstall` remain available. Use the same installation/data roots used at installation. Installer-managed services use `C:\Program Files\GeForce Sidepiece\service` as `-InstallRoot`.
 
 If the process crashes or is forcibly killed, the local URLs may remain redirected. Keep `route.key` and use the installed executable with `--data-dir 'C:\ProgramData\GeForceSidepiece' --restore` **only after the service has stopped**. See [hosting and recovery](docs/hosting.md) before deleting files.
 
 ## Configurable, not a hard-coded patch
 `C:\ProgramData\GeForceSidepiece\config.json` controls explicit device and endpoint allow/deny lists, exact GET endpoint matches and conditional scalar overrides. Rules are reloaded per request; invalid rules disable rewriting while ordinary forwarding continues. Validate edits with the installed executable’s `--data-dir ... --validate` command. Blacklists win. The upstream host stays fixed to `gfwsl.geforce.com`.
 
-Start with [the example](config/config.example.json), [schema](config/schema.json), and [configuration guide](docs/configuration.md). Extra endpoint names and top-level scalar overrides require configuration, not recompilation. Request bodies and responses are not rewritten.
+The on-demand configurator uses built-in Windows PowerShell 5.1 and WinForms; it adds no resident UI or runtime to the native service. Start with [the example](config/config.example.json), [schema](config/schema.json), and [configuration guide](docs/configuration.md). Extra endpoint names and top-level scalar overrides require configuration, not recompilation. Request bodies and responses are not rewritten.
 
 ## How it works
 NVIDIA App → tokenized loopback listener → narrow metadata rules → NVIDIA HTTPS API.

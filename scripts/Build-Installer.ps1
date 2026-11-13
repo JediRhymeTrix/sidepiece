@@ -1,0 +1,27 @@
+#requires -Version 5.1
+param([switch]$InstallCompiler)
+$ErrorActionPreference='Stop'
+$root=Split-Path $PSScriptRoot -Parent
+$compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
+if(-not (Test-Path -LiteralPath $compiler) -or (Get-Item -LiteralPath $compiler).VersionInfo.FileVersion -notlike '6.4.3*'){
+ if(-not $InstallCompiler){throw 'Install Inno Setup 6.4.3, or use -InstallCompiler on a disposable build runner.'}
+ & choco install innosetup --version=6.4.3 --yes --no-progress --force --allow-downgrade
+ if($LASTEXITCODE){throw 'Inno compiler installation failed'}
+}
+$version=([IO.File]::ReadAllText((Join-Path $root 'VERSION'))).Trim()
+if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'Invalid version'}
+$payload=Join-Path $root 'build\installer-payload'
+if(Test-Path $payload){Remove-Item -LiteralPath $payload -Recurse -Force}
+New-Item -ItemType Directory -Path $payload|Out-Null
+Copy-Item -LiteralPath (Join-Path $root 'build\sidepiece.exe') -Destination $payload
+foreach($file in 'LICENSE','README.md','SECURITY.md','VERSION'){Copy-Item -LiteralPath (Join-Path $root $file) -Destination $payload}
+Copy-Item -LiteralPath (Join-Path $root 'config') -Destination $payload -Recurse
+New-Item -ItemType Directory -Path (Join-Path $payload 'scripts')|Out-Null
+foreach($file in 'Setup.ps1','Gpu.ps1','Configure.ps1','Installer.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $payload 'scripts')}
+& $compiler ('/DProductVersion='+$version) (Join-Path $root 'installer\sidepiece.iss')
+if($LASTEXITCODE){throw 'Installer compilation failed'}
+$dist=Join-Path $root 'dist'
+$lines=foreach($file in @((Join-Path $dist ('sidepiece-'+$version+'-windows-x64.zip')),(Join-Path $dist ('Sidepiece-Setup-'+$version+'-windows-x64.exe')))){
+ (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($file)
+}
+[IO.File]::WriteAllText((Join-Path $dist 'SHA256SUMS.txt'),($lines -join "`n")+"`n",[Text.UTF8Encoding]::new($false))

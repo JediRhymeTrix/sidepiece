@@ -1,8 +1,11 @@
 #requires -Version 5.1
 [CmdletBinding(SupportsShouldProcess)]
 param(
- [ValidateSet('Install','Update','Uninstall','Status','ListGpus')][string]$Action='Install',
+ [ValidateSet('Install','Update','Uninstall','Status','ListGpus','Configure','Start','Stop')][string]$Action='Install',
  [string[]]$DeviceId=@(),
+ [string[]]$DeniedDeviceId=@(),
+ [string]$ConfigText,
+ [string]$ExpectedConfigHash,
  [string]$BinaryPath=(Join-Path (Split-Path $PSScriptRoot -Parent) 'sidepiece.exe'),
  [string]$InstallRoot=(Join-Path $env:ProgramFiles 'GeForce Sidepiece'),
  [string]$DataRoot=(Join-Path $env:ProgramData 'GeForceSidepiece')
@@ -55,7 +58,8 @@ function Wait-Healthy($Exe){
  throw 'Service did not become healthy; installation rolled back.'
 }
 if($Action-eq 'ListGpus'){
- Get-CimInstance Win32_VideoController | Select-Object Name,PNPDeviceID
+ . (Join-Path $PSScriptRoot 'Gpu.ps1')
+ Get-SidepieceGpus | Select-Object Name,DeviceId,Status,ProblemCode
  Write-Host 'Select the external desktop GPU explicitly. Detection does not infer Thunderbolt/OCuLink topology.'
  exit
 }
@@ -76,6 +80,27 @@ if($existing){
  $image=(Get-ItemProperty -LiteralPath ('HKLM:\SYSTEM\CurrentControlSet\Services\'+$name)).ImagePath
  $sid=([Security.Principal.NTAccount]::new('NT SERVICE\'+$name)).Translate([Security.Principal.SecurityIdentifier]).Value
  if($saved.serviceName -ne $name -or $saved.installRoot -ne $InstallRoot -or $saved.dataRoot -ne $DataRoot -or $saved.serviceSid -ne $sid -or $image -ne $expected){throw 'Installation ownership mismatch.'}
+}
+if($Action -in 'Configure','Start','Stop'){
+ if(-not $existing){throw 'No owned standalone installation found.'}
+ $exe=Join-Path $InstallRoot 'sidepiece.exe'
+ if($Action -eq 'Stop'){Stop-Owned;return}
+ if($Action -eq 'Start'){Start-Service $name;Wait-Healthy $exe;return}
+ if(-not $ConfigText -or [Text.Encoding]::UTF8.GetByteCount($ConfigText) -gt 65536){throw 'Configuration must contain 1-65536 UTF-8 bytes.'}
+ $path=Join-Path $DataRoot 'config.json'
+ if(-not $ExpectedConfigHash -or (Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $ExpectedConfigHash){throw 'Configuration changed; reload before saving.'}
+ $stage=Join-Path $DataRoot ('validate-'+[guid]::NewGuid().ToString('N'))
+ $candidate=Join-Path $DataRoot ('config-'+[guid]::NewGuid().ToString('N')+'.tmp')
+ try{
+  New-Item -ItemType Directory -Path $stage|Out-Null
+  [IO.File]::WriteAllText((Join-Path $stage 'config.json'),$ConfigText,[Text.UTF8Encoding]::new($false))
+  Native $exe @('--data-dir',$stage,'--prepare')
+  [IO.File]::WriteAllText($candidate,$ConfigText,[Text.UTF8Encoding]::new($false))
+  if((Get-FileHash -LiteralPath $path -Algorithm SHA256).Hash -ne $ExpectedConfigHash){throw 'Configuration changed during validation; reload before saving.'}
+  [IO.File]::Replace($candidate,$path,(Join-Path $DataRoot 'config.previous.json'))
+  Write-Host 'Configuration validated and saved. Service running/stopped state was preserved.'
+ }finally{if(Test-Path -LiteralPath $candidate){Remove-Item -LiteralPath $candidate -Force};if(Test-Path -LiteralPath $stage){Remove-Item -LiteralPath $stage -Recurse -Force}}
+ return
 }
 if($Action-eq 'Uninstall'){
  if(-not (Test-Path -LiteralPath $manifest)){throw 'Owned installation manifest not found; refusing uninstall.'}
@@ -102,7 +127,7 @@ if(-not $existing){
  $listener=[Net.Sockets.TcpListener]::new([Net.IPAddress]::Loopback,80)
  try{$listener.Start()}catch{throw 'Loopback port 80 is occupied. Stop/restore any existing bridge through its manager first.'}finally{$listener.Stop()}
  if(-not $DeviceId.Count){throw 'Supply -DeviceId with the exact desktop eGPU ID. Run -Action ListGpus; see docs/configuration.md for conversion.'}
- foreach($id in $DeviceId){if($id-cnotmatch '^[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9]+$'){throw 'Device IDs must use exact uppercase NVIDIA metadata format.'}}
+ foreach($id in @($DeviceId)+@($DeniedDeviceId)){if($id.Length -gt 40 -or $id-cnotmatch '^[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9]+$'){throw 'Device IDs must use exact uppercase NVIDIA metadata format.'}}
  $local=Get-Content -LiteralPath $nvFiles[0] -Raw|ConvertFrom-Json
  if($local.localizedConfig.gfwsl.server-ne 'https://gfwsl.geforce.com/'){throw 'Unknown or already redirected NVIDIA endpoint; restore its owner first.'}
 }
@@ -122,7 +147,7 @@ try{
    $rule=[Security.AccessControl.FileSystemAccessRule]::new([Security.Principal.SecurityIdentifier]::new($serviceSid),'Modify','ContainerInherit,ObjectInherit','None','Allow');$acl.AddAccessRule($rule);Set-Acl -LiteralPath $parent -AclObject $acl
   }
   $template=Join-Path (Split-Path $PSScriptRoot -Parent) 'config\config.example.json'
-  $config=Get-Content -LiteralPath $template -Raw|ConvertFrom-Json;$config.whitelistDeviceIds=@($DeviceId)
+  $config=Get-Content -LiteralPath $template -Raw|ConvertFrom-Json;$config.whitelistDeviceIds=@($DeviceId);$config.blacklistDeviceIds=@($DeniedDeviceId)
   [IO.File]::WriteAllText((Join-Path $DataRoot 'config.json'),($config|ConvertTo-Json -Depth 12),[Text.UTF8Encoding]::new($false))
  }else{
   Stop-Owned
