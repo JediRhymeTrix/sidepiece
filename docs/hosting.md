@@ -5,7 +5,7 @@ Setup registers `GeForceSidepiece` for automatic startup under LocalService plus
 
 Run setup/control commands elevated. `Setup.ps1` supports `Install` (default), `Update`, `Uninstall`, `Status`, `ListGpus`, `Configure`, `Start`, `Stop`, `-WhatIf`, `-BinaryPath`, `-InstallRoot` and `-DataRoot`. Use the same custom roots for subsequent operations. Choose trusted local, unused directories; quotes, reparse points and traversal paths are rejected. Reinstall does not overwrite retained files: after uninstall, review/archive them manually or select fresh roots.
 
-Update requires an owned service/manifest, stops safely, preserves custom configuration and keeps `sidepiece.previous.exe` for rollback. Service-start health failures trigger rollback. Setup never force-kills a host that cannot restore its URLs. Do not invoke setup with its own installed binary as the update source.
+Update requires an owned service/manifest, stops safely, preserves custom configuration and keeps `sidepiece.previous.exe` for rollback. Service-start health failures trigger rollback. A deliberately stopped service stays stopped through update or rollback; a running service is health-checked after restart. Setup never force-kills a host that cannot restore its URLs. Do not invoke setup with its own installed binary as the update source.
 
 Stop through `Stop-Service GeForceSidepiece`. Restore occurs before shutdown is signaled; restoration failure is reported and the host remains running. Workers drain for at most 70 seconds while SCM checkpoints advance. Do not force termination simply because Services briefly displays Stop Pending.
 
@@ -36,6 +36,11 @@ Use exactly one host. Migration requires stopping/restoring through the old mana
 - `--fixture-root`, `--port`: test-only controls; serving requires passive mode. Not a supported production customization.
 
 Modes are mutually exclusive. Production listens on IPv4 loopback port 80, matching the current NVIDIA configuration scheme.
+
+## Interrupted setup
+Setup saves an ownership manifest and a protected `Recover.ps1` beside the service executable before starting it. If a new EXE installation cannot finish normally, it attempts safe service removal and URL restoration. This is best-effort cleanup, not an atomic transaction across the filesystem, registry and service manager. Forced termination or power loss can bypass it. An interrupted upgrade may leave the updated service with older UI files; preserve recovery data and retry the installer after resolving the underlying problem.
+
+If Installed Apps is unavailable after interrupted setup, run the retained helper in elevated Windows PowerShell: `& 'C:\Program Files\GeForce Sidepiece\service\Recover.ps1' -Action Uninstall -InstallRoot 'C:\Program Files\GeForce Sidepiece\service'`. Use your original roots for a custom/scripted installation. The helper restores owned URLs and removes the service; it deliberately retains files. After successful restoration, review/archive retained installation and data directories before reinstalling. Do not delete them while redirects remain active.
 
 ## Crash recovery and troubleshooting
 1. Stop the host via its manager if it is alive. Check that the expected process has exited.
