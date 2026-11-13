@@ -19,8 +19,11 @@ No telemetry or external analytics are included. Forwarded NVIDIA requests still
 
 Never publish `route.key`, runtime configuration, backups, raw NVIDIA URLs, credentials or complete NVIDIA logs. Issue templates request redacted information only.
 
+## Distribution
+Published binaries are not Authenticode-signed. Verify each download against the checksum file from the same release. This detects corruption, not a compromised publishing account. Compiler provisioning uses an official, SHA-256-pinned download with a valid Authenticode signature; that does not sign Sidepiece itself. No independent security audit or provenance attestation is claimed.
+
 ## Failure modes
-Graceful stop restores owned endpoint strings before stopping. A crash, power loss, forced termination or failed restore can leave redirected URLs behind. Keep the route key; stop the host and use `--restore` with the same data directory. Unknown destinations are refused, not overwritten. Do not replace complete NVIDIA JSON files with old backups; that may lose newer settings.
+Graceful stop restores owned endpoint strings before stopping. A crash, power loss, forced termination or failed restore can leave redirected URLs behind. Interrupted setup retains a protected recovery helper and ownership manifest; automatic cleanup is best effort and can be bypassed by forced termination. Keep the route key; stop the host and use `--restore` with the same data directory. Unknown destinations are refused, not overwritten. Do not replace complete NVIDIA JSON files with old backups; that may lose newer settings.
 
 ## Reporting
 Report vulnerabilities privately using [GitHub private vulnerability reporting](https://github.com/JediRhymeTrix/sidepiece/security/advisories/new) when enabled. If unavailable, open a minimal issue requesting a private reporting channel without exploit details or secrets. Do not attach live route keys or unredacted logs.

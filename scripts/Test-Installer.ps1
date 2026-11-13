@@ -22,9 +22,19 @@ try{
  [IO.File]::WriteAllText($loc,$localText,$utf8);[IO.File]::WriteAllText($profiles,$profileText,$utf8)
  Run-Installer $installer '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -ExpectFailure
  if(Get-Service GeForceSidepiece -ErrorAction SilentlyContinue){throw 'No-selection install created service'}
+ Run-Installer (Join-Path $root 'build\FailureFixture.exe') '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /GPU=ABCD_10DE_1234_5678_1' -ExpectFailure
+ if(Get-Service GeForceSidepiece -ErrorAction SilentlyContinue){throw 'Interrupted setup left active service'}
+ if([IO.File]::ReadAllText($loc) -cne $localText -or [IO.File]::ReadAllText($profiles) -cne $profileText){throw 'Interrupted setup failed restoration'}
+ if(-not (Test-Path (Join-Path $install 'service\Recover.ps1')) -or -not (Test-Path (Join-Path $data 'route.key'))){throw 'Interrupted setup lost recovery files'}
+ foreach($p in @($install,$data)){if(Test-Path $p){Remove-Item -LiteralPath $p -Recurse -Force}}
  Run-Installer $installer '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /GPU=ABCD_10DE_1234_5678_1'
  if((Get-Service GeForceSidepiece).Status -ne 'Running'){throw 'Installed service not running'}
  $backend=Join-Path $install 'payload\scripts\Setup.ps1';$service=Join-Path $install 'service'
+ $recovery=Join-Path $service 'Recover.ps1'
+ if(-not (Test-Path $recovery)){throw 'Protected recovery helper missing'}
+ $shortcut=Join-Path $env:ProgramData 'Microsoft\Windows\Start Menu\Programs\Configure GeForce Sidepiece.lnk'
+ $link=(New-Object -ComObject WScript.Shell).CreateShortcut($shortcut)
+ if($link.Arguments -notlike '*payload\scripts\Configure.ps1*' -or $link.Arguments -notlike '*-STA*'){throw 'Installed shortcut target invalid'}
  $config=Join-Path $data 'config.json'
  $before=[IO.File]::ReadAllText($config);$hash=(Get-FileHash $config -Algorithm SHA256).Hash
  $rejected=$false
@@ -32,6 +42,12 @@ try{
  if(-not $rejected -or [IO.File]::ReadAllText($config) -cne $before){throw 'Invalid config not refused/preserved'}
  $c=$before|ConvertFrom-Json;$c.blacklistDeviceIds=@('FFFF_10DE_0000_0000_1');$c.rules+=@{endpoint='customMetadata';method='GET';overrides=@(@{field='mode';from='old';to='new'})}
  $custom=$c|ConvertTo-Json -Depth 64
+ $lock=[IO.File]::Open($config,[IO.FileMode]::Open,[IO.FileAccess]::Read,[IO.FileShare]::Read)
+ try{
+  $rejected=$false
+  try{& $backend -Action Configure -InstallRoot $service -DataRoot $data -ConfigText $custom -ExpectedConfigHash $hash}catch{$rejected=$true}
+  if(-not $rejected -or [IO.File]::ReadAllText($config) -cne $before){throw 'Blocked save changed configuration'}
+ }finally{$lock.Dispose()}
  & $backend -Action Configure -InstallRoot $service -DataRoot $data -ConfigText $custom -ExpectedConfigHash $hash
  $rejected=$false
  try{& $backend -Action Configure -InstallRoot $service -DataRoot $data -ConfigText $before -ExpectedConfigHash $hash}catch{$rejected=$true}
@@ -40,10 +56,34 @@ try{
  $hash=(Get-FileHash $config -Algorithm SHA256).Hash
  & $backend -Action Configure -InstallRoot $service -DataRoot $data -ConfigText $custom -ExpectedConfigHash $hash
  if((Get-Service GeForceSidepiece).Status -ne 'Stopped'){throw 'Saving started a stopped service'}
+ Run-Installer $installer '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
+ if((Get-Service GeForceSidepiece).Status -ne 'Stopped'){throw 'Upgrade started stopped service'}
  & $backend -Action Start -InstallRoot $service -DataRoot $data
+ $exe=Join-Path $service 'sidepiece.exe';$binaryHash=(Get-FileHash $exe -Algorithm SHA256).Hash
+ $bad=Join-Path $env:TEMP ('sidepiece-bad-'+[guid]::NewGuid().ToString('N')+'.exe')
+ try{
+  [IO.File]::WriteAllText($bad,'not an executable')
+  $rejected=$false
+  try{& $backend -Action Update -InstallRoot $service -DataRoot $data -BinaryPath $bad}catch{$rejected=$true}
+  if(-not $rejected -or (Get-FileHash $exe -Algorithm SHA256).Hash -ne $binaryHash -or (Get-Service GeForceSidepiece).Status -ne 'Running'){throw 'Failed update did not roll back'}
+ }finally{Remove-Item -LiteralPath $bad -Force}
  Run-Installer $installer '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
  if([IO.File]::ReadAllText($config) -cne $custom){throw 'Installer upgrade lost custom rules'}
+ # Crash recovery: retain the same key; never overwrite whole NVIDIA files from backups.
+ $pidValue=(Get-CimInstance Win32_Service -Filter "Name='GeForceSidepiece'").ProcessId
+ Stop-Process -Id $pidValue -Force
+ (Get-Service GeForceSidepiece).WaitForStatus('Stopped',[timespan]::FromSeconds(20))
+ & $exe --data-dir $data --restore
+ if($LASTEXITCODE -or [IO.File]::ReadAllText($loc) -cne $localText){throw 'Crash restore failed'}
+ & $backend -Action Start -InstallRoot $service -DataRoot $data
+ & $backend -Action Stop -InstallRoot $service -DataRoot $data
+ [IO.File]::WriteAllText($loc,$localText.Replace('https://gfwsl.geforce.com/','https://example.invalid/'),$utf8)
  $uninstall=Join-Path $install 'unins000.exe'
+ try{
+  Run-Installer $uninstall '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART' -ExpectFailure
+  if(-not (Test-Path $backend) -or -not (Get-Service GeForceSidepiece -ErrorAction SilentlyContinue)){throw 'Failed restore removed recovery tools/service'}
+ }finally{[IO.File]::WriteAllText($loc,$localText,$utf8)}
+ & $backend -Action Start -InstallRoot $service -DataRoot $data
  $manifest=Join-Path $data 'installation.json';$owned=[IO.File]::ReadAllText($manifest)
  try{
   $foreign=$owned|ConvertFrom-Json;$foreign.installRoot='C:\ForeignInstallation'
@@ -53,6 +93,8 @@ try{
  }finally{[IO.File]::WriteAllText($manifest,$owned,$utf8)}
  Run-Installer $uninstall '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART'
  if(Get-Service GeForceSidepiece -ErrorAction SilentlyContinue){throw 'Service survived uninstall'}
+ & $recovery -Action Uninstall -InstallRoot $service -DataRoot $data
+ if(-not (Test-Path $recovery)){throw 'Uninstall removed standalone recovery helper'}
  if([IO.File]::ReadAllText($loc) -cne $localText -or [IO.File]::ReadAllText($profiles) -cne $profileText){throw 'Uninstall did not restore exact NVIDIA fixture bytes'}
  if(-not (Test-Path (Join-Path $data 'route.key'))){throw 'Uninstall deleted recovery data'}
  Run-Installer $installer '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /GPU=ABCD_10DE_1234_5678_1' -ExpectFailure

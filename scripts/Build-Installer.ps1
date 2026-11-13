@@ -28,6 +28,10 @@ New-Item -ItemType Directory -Path (Join-Path $payload 'scripts')|Out-Null
 foreach($file in 'Setup.ps1','Gpu.ps1','Configure.ps1','Installer.ps1'){Copy-Item -LiteralPath (Join-Path $PSScriptRoot $file) -Destination (Join-Path $payload 'scripts')}
 & $compiler ('/DProductVersion='+$version) (Join-Path $root 'installer\sidepiece.iss')
 if($LASTEXITCODE){throw 'Installer compilation failed'}
+if($env:GITHUB_ACTIONS -eq 'true' -and $env:RUNNER_ENVIRONMENT -eq 'github-hosted'){
+ & $compiler ('/DProductVersion='+$version) '/DInstallerFailureTest' ('/O'+(Join-Path $root 'build')) '/FFailureFixture' (Join-Path $root 'installer\sidepiece.iss')
+ if($LASTEXITCODE){throw 'Failure-fixture compilation failed'}
+}
 $dist=Join-Path $root 'dist'
 $lines=foreach($file in @((Join-Path $dist ('sidepiece-'+$version+'-windows-x64.zip')),(Join-Path $dist ('Sidepiece-Setup-'+$version+'-windows-x64.exe')))){
  (Get-FileHash -LiteralPath $file -Algorithm SHA256).Hash.ToLowerInvariant()+'  '+[IO.Path]::GetFileName($file)

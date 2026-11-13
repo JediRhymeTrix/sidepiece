@@ -17,20 +17,20 @@ Your Thunderbolt, USB4 or OCuLink enclosure contains a **desktop NVIDIA GPU**, b
 
 This is a workaround for that specific classification issue—not a general NVIDIA App repair tool. It does not install drivers, enable/disable GPUs, spoof hardware, bypass compatibility checks, change certificates or set a system-wide proxy. An internal laptop GPU can remain denied, even when disabled in Device Manager. Mixed-device requests are not rewritten unless every device is allowlisted and none is denied.
 
-**Unofficial and unaffiliated with NVIDIA.** GeForce and NVIDIA are their respective owners’ trademarks. The name and tagline are jokes, not claims about any person.
+**Unofficial and unaffiliated with NVIDIA.** GeForce and NVIDIA are their respective owners’ trademarks. The name is playful; the scope is deliberately narrow.
 
 ## Tiny on purpose
 - Native C++ using Windows Winsock, WinHTTP and BCrypt; **no third-party runtime dependencies**.
 - One process under native Windows Service Control Manager: no resident PowerShell, Python, Node, .NET host or service wrapper.
 - Event-driven idle loop, streaming responses and at most eight concurrent clients.
-- The tested predecessor was **about 256 KiB on disk**, **3.57 MiB private memory**, and **15.45 MiB working set** after live requests; idle CPU time did not increase during a 15-second sample.
+- On-demand configuration using built-in Windows components; no tray app or always-on UI.
 
-Those measurements describe the predecessor on one Windows machine, **not a benchmark for the current release**. TLS caches, traffic and Windows versions affect memory. Working set is not private memory. A pdsvc/cmd/conhost wrapper adds its own overhead; the measured predecessor’s entire wrapped tree was 13.90 MiB private / 38.65 MiB working set. Native SCM hosting avoids those wrapper processes. See [measurement instructions](docs/development.md).
+Small by design, not by benchmark marketing. Memory varies with TLS initialization, traffic and Windows. See [development and measurement](docs/development.md) for methodology and the distinction between private memory, working set and wrapper overhead.
 
 ## Install in a few clicks
 **Requires:** Windows x64, NVIDIA App installed and opened at least once, administrator access, and free loopback port 80. Releases are **experimental and unsigned**; verify the checksum before running. No signing or SmartScreen reputation is claimed.
 
-1. Download **`Sidepiece-Setup-0.2.2-windows-x64.exe`** and `SHA256SUMS.txt` from [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <downloaded-exe> -Algorithm SHA256` with its entry.
+1. Download the **Windows x64 setup EXE** (`Sidepiece-Setup-<version>-windows-x64.exe`) and `SHA256SUMS.txt` from the release you choose on [Releases](https://github.com/JediRhymeTrix/sidepiece/releases). Compare `Get-FileHash <downloaded-exe> -Algorithm SHA256` with its entry.
 2. Run the installer and approve elevation. The configuration window shows NVIDIA GPU names, suggested metadata IDs and device state—including disabled GPUs.
 3. Select your **external desktop GPU**, click **Allow selected GPU**, and review the editable ID. Optionally deny your internal laptop GPU. Nothing is selected automatically: a GPU name cannot establish enclosure topology, and the suggested `_1` suffix may need correction. [GPU selection details](docs/configuration.md#selecting-a-gpu).
 4. Click **Install and verify**, confirm your selection, then reopen NVIDIA App and check driver discovery.
@@ -45,7 +45,7 @@ Download and extract the ZIP instead. In an elevated PowerShell window, run ` .\
 ## Configure, update or remove
 - **Configure:** open **Configure GeForce Sidepiece** from Start. Edit allow/deny lists, toggle overrides, or use **Advanced JSON** for custom rules. Saves validate before replacing configuration and preserve running/stopped state.
 - **Stop and restore / Start service:** use the configurator buttons. Disabling metadata overrides is not the same as stopping the bridge.
-- **Update:** run the newer installer. Custom rules are preserved. Script-installed services must use `Setup.ps1 -Action Update` instead; installation layouts are not silently converted.
+- **Update:** run the newer installer. Custom rules and running/stopped state are preserved. Script-installed services must use `Setup.ps1 -Action Update` instead; installation layouts are not silently converted.
 - **Uninstall:** use Windows **Installed Apps**. URL restoration must succeed before UI files are removed. Service binaries, configuration, route key and backups remain for recovery; review/archive them before reinstalling.
 - **Scripted setup:** `Setup.ps1 -Action Status`, `-Action Stop`, `-Action Start`, `-Action Update` and `-Action Uninstall` remain available. Use the same installation/data roots used at installation. Installer-managed services use `C:\Program Files\GeForce Sidepiece\service` as `-InstallRoot`.
 
@@ -70,7 +70,9 @@ The local route key is a capability secret, not a security boundary against admi
 - [Build, tests and footprint measurements](docs/development.md)
 - [Release process](docs/releases.md) · [Contributing](CONTRIBUTING.md) · [MIT license](LICENSE)
 
-## Compatibility and verification limits
-The predecessor’s live API comparisons confirmed byte-identical expected responses for desktop, laptop and unrelated requests. That does **not** establish that every NVIDIA App version refreshes its UI correctly. Real NVIDIA App GUI confirmation and broad hardware testing remain outstanding. Fixture tests are not hardware certification. NVIDIA can change these private settings or API formats; unknown layouts fail closed instead of being guessed.
+## Compatibility and release status
+The deployed bridge has been confirmed working by its user on one affected desktop-eGPU setup. Earlier API comparisons also matched expected desktop, laptop and unrelated responses. This is useful real-world evidence—not a claim of universal NVIDIA App or enclosure compatibility.
+
+Automated coverage runs on Windows Server 2022 and 2025 and exercises native behavior, service lifecycle, configuration, packaging and installer recovery using synthetic settings. Those runners do not establish Windows desktop UAC behavior, a full human click-through, physical reboot/power-loss recovery or broad hardware support. Releases remain unsigned experimental prereleases while that coverage grows. NVIDIA can change these private settings or API formats; unrecognized endpoint layouts are refused rather than guessed.
 
 If a driver is genuinely unavailable for your GPU/OS/channel, Sidepiece cannot make it compatible. If NVIDIA fixes the classification, stop and uninstall this workaround.

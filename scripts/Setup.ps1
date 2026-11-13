@@ -106,11 +106,11 @@ if($Action -in 'Configure','Start','Stop'){
 if($Action-eq 'Uninstall'){
  if(-not (Test-Path -LiteralPath $manifest)){throw 'Owned installation manifest not found; refusing uninstall.'}
  $saved=Get-Content -LiteralPath $manifest -Raw|ConvertFrom-Json
- if($saved.serviceName-ne $name-or $saved.installRoot-ne $InstallRoot){throw 'Installation ownership mismatch.'}
+ if($saved.serviceName-ne $name-or $saved.installRoot-ne $InstallRoot-or $saved.dataRoot-ne $DataRoot){throw 'Installation ownership mismatch.'}
  Stop-Owned
  $exe=Join-Path $InstallRoot 'sidepiece.exe'
  Native $exe @('--data-dir',$DataRoot,'--restore')
- Native sc.exe @('delete',$name)
+ if($existing){Native sc.exe @('delete',$name)}
  foreach($entry in $saved.nvidiaAcls){Remove-ServiceGrant $entry.path $saved.serviceSid}
  Write-Host 'Service removed; NVIDIA URLs restored. Binaries, settings and backups retained for recovery.'
  return
@@ -132,6 +132,8 @@ if(-not $existing){
  $local=Get-Content -LiteralPath $nvFiles[0] -Raw|ConvertFrom-Json
  if($local.localizedConfig.gfwsl.server-ne 'https://gfwsl.geforce.com/'){throw 'Unknown or already redirected NVIDIA endpoint; restore its owner first.'}
 }
+if($existing -and $BinaryPath -ieq (Join-Path $InstallRoot 'sidepiece.exe')){throw 'Use a newly extracted binary as the update source, not the installed executable.'}
+$wasRunning=$existing -and $existing.Status -ne 'Stopped'
 $created=$false;$oldBinary=$null;$aclState=@();$oldConfig=$null
 try{
  if(-not $existing){
@@ -150,20 +152,23 @@ try{
   $template=Join-Path (Split-Path $PSScriptRoot -Parent) 'config\config.example.json'
   $config=Get-Content -LiteralPath $template -Raw|ConvertFrom-Json;$config.whitelistDeviceIds=@($DeviceId);$config.blacklistDeviceIds=@($DeniedDeviceId)
   [IO.File]::WriteAllText((Join-Path $DataRoot 'config.json'),($config|ConvertTo-Json -Depth 12),[Text.UTF8Encoding]::new($false))
+  $state=@{serviceName=$name;installRoot=$InstallRoot;dataRoot=$DataRoot;serviceSid=$serviceSid;nvidiaAcls=$aclState}
+  [IO.File]::WriteAllText($manifest,($state|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))
  }else{
   Stop-Owned
-  $oldBinary=Join-Path $DataRoot 'sidepiece.previous.exe'
-  Copy-Item -LiteralPath (Join-Path $InstallRoot 'sidepiece.exe') -Destination $oldBinary -Force
+  $backup=Join-Path $DataRoot 'sidepiece.previous.exe'
+  Copy-Item -LiteralPath (Join-Path $InstallRoot 'sidepiece.exe') -Destination $backup -Force
+  $oldBinary=$backup
   $oldConfig=[IO.File]::ReadAllText((Join-Path $DataRoot 'config.json'))
  }
  $dest=Join-Path $InstallRoot 'sidepiece.exe'
  Copy-Item -LiteralPath $BinaryPath -Destination $dest -Force
  Native $dest @('--data-dir',$DataRoot,'--prepare')
  Native $dest @('--data-dir',$DataRoot,'--validate')
- Start-Service -Name $name
- Wait-Healthy $dest
- if($created){$state=@{serviceName=$name;installRoot=$InstallRoot;dataRoot=$DataRoot;serviceSid=$serviceSid;nvidiaAcls=$aclState};[IO.File]::WriteAllText($manifest,($state|ConvertTo-Json -Depth 6),[Text.UTF8Encoding]::new($false))}
- Write-Host 'GeForce Sidepiece is installed and healthy. Reopen NVIDIA App if it cached old endpoints.'
+ $recovery=Join-Path $InstallRoot 'Recover.ps1'
+ if($PSCommandPath -ine $recovery){Copy-Item -LiteralPath $PSCommandPath -Destination $recovery -Force}
+ if($created -or $wasRunning){Start-Service -Name $name;Wait-Healthy $dest}
+ Write-Host 'GeForce Sidepiece installed/updated and validated; previous service state preserved. Reopen NVIDIA App if needed.'
 }catch{
  $failure=$_.Exception.Message
  try{Stop-Owned}catch{Write-Warning 'Service could not stop safely; retained files/permissions for recovery.';throw}
@@ -171,6 +176,6 @@ try{
   if(Test-Path -LiteralPath (Join-Path $DataRoot 'route.key')){Native (Join-Path $InstallRoot 'sidepiece.exe') @('--data-dir',$DataRoot,'--restore')}
   Native sc.exe @('delete',$name)
   foreach($entry in $aclState){Remove-ServiceGrant $entry.path $serviceSid}
- }elseif($oldBinary){Copy-Item -LiteralPath $oldBinary -Destination (Join-Path $InstallRoot 'sidepiece.exe') -Force;if($null-ne $oldConfig){[IO.File]::WriteAllText((Join-Path $DataRoot 'config.json'),$oldConfig,[Text.UTF8Encoding]::new($false))};Start-Service $name}
+ }elseif($oldBinary){Copy-Item -LiteralPath $oldBinary -Destination (Join-Path $InstallRoot 'sidepiece.exe') -Force;if($null-ne $oldConfig){[IO.File]::WriteAllText((Join-Path $DataRoot 'config.json'),$oldConfig,[Text.UTF8Encoding]::new($false))};if($wasRunning){Start-Service $name;Wait-Healthy (Join-Path $InstallRoot 'sidepiece.exe')}}
  throw $failure
 }

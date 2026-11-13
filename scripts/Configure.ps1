@@ -121,10 +121,13 @@ try{
  Load-Configuration
  if($SmokeTest){
   if(-not $Install){throw 'UI smoke mode requires -Install and never installs anything.'}
+  $custom=$raw.Text|ConvertFrom-Json
+  $custom.rules+=@{endpoint='customMetadata';method='GET';overrides=@(@{field='mode';from='old';to='new'})}
+  $raw.Text=$custom|ConvertTo-Json -Depth 64
   $allow.Text='ABCD_10DE_1234_5678_1';$deny.Text='FFFF_10DE_0000_0000_1';$enabled.Checked=$true
   Sync-Basic
   $c=$raw.Text|ConvertFrom-Json
-  if($c.whitelistDeviceIds[0] -ne 'ABCD_10DE_1234_5678_1' -or $c.rules.Count -ne 2 -or $list.Items.Count -ne 1){throw 'UI synchronization failed'}
+  if($c.whitelistDeviceIds[0] -ne 'ABCD_10DE_1234_5678_1' -or $c.blacklistDeviceIds[0] -ne 'FFFF_10DE_0000_0000_1' -or $c.rules.Count -ne 3 -or $c.rules[2].overrides[0].to -ne 'new' -or $list.Items.Count -ne 1){throw 'UI synchronization/custom-rule preservation failed'}
   $tabs.SelectedTab=$advanced;$tabs.SelectedTab=$basic
   Write-Host 'WinForms configurator construction and basic/advanced synchronization passed; no service changes.'
  }else{

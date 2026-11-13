@@ -1,6 +1,6 @@
 # Releases
 
-`VERSION` is the single product version. A `vX.Y.Z` tag must match it exactly. Only tag a commit whose main-branch CI has passed. Initial `v0.1.0` is a prerelease; all 0.x releases remain prereleases until hardware/UI and installer coverage justify a stable release.
+`VERSION` is the single product version. A `vX.Y.Z` tag must match it exactly. Only tag a commit whose main-branch CI has passed. All 0.x releases remain experimental prereleases. A working user deployment is recorded as single-setup evidence, not hardware certification or validation of every installer path.
 
 The release workflow rebuilds with MSVC static analysis, runs native and isolated lifecycle checks, runs GPU/UI smoke tests, packages an explicit allowlist into a Windows x64 ZIP, compiles the single-file setup EXE with pinned Inno Setup 6.4.3, exercises that EXE on a disposable runner and emits SHA-256 checksums for both downloads. Publishing uses GitHub-generated release notes categorized by `.github/release.yml`. No binary signing, silent updater or independent provenance attestation is claimed. Workflow identity, source commit and build logs are available in Actions; checksums detect corruption, not compromise of the publishing account.
 
@@ -8,4 +8,12 @@ The ZIP contains `sidepiece.exe`, setup/GPU/configuration helpers, example/schem
 
 Before publishing, inspect package contents and tracked files for private data; verify CI, tag/version consistency, generated notes, checksum and downloaded assets. Test setup/update/uninstall on disposable Windows with synthetic settings; retain the limits in release notes if real NVIDIA hardware/UI testing is not complete.
 
-Suggested local packaging: `scripts/Package.ps1` after a successful analyzed build. Release automation is tag-driven; it does not publish every main-branch commit. GitHub releases are the only intended binary distribution channel.
+## Publication gate
+A publishable experimental candidate must pass both Windows CI jobs, include the expected helper paths in the ZIP, and pass the compiled install/configure/update/uninstall and failure-recovery fixtures. Inspect downloaded artifacts again after publication: compare both hashes, check the native version, and run the packaged configurator's non-mutating smoke check. A green source-tree build alone does not validate packaged launch paths.
+
+Use version-independent download instructions in documentation: `Sidepiece-Setup-<version>-windows-x64.exe`. Keep exact versions in `VERSION`, tags and generated assets, not in quick-start prose. Describe known limitations prominently; do not turn a user report into a claim of broad compatibility.
+
+Stable promotion is a separate decision. Record a real desktop installer walkthrough (including elevation, cancellation and uninstall), supported Windows/NVIDIA App versions, and restart/reboot behavior before claiming those paths are verified. Code signing and an independent security review are recommended; neither is currently claimed. Automated fault injection is not a substitute for physical power-loss or full-disk testing.
+
+## Build and publish
+Run `scripts/Package.ps1` after a successful analyzed build, then `scripts/Build-Installer.ps1` with the pinned compiler. Release automation is tag-driven; pushing a candidate to main does not publish it. Only tag the reviewed, green-CI commit. GitHub releases are the intended binary distribution channel; fault-injected build fixtures must never be uploaded as release assets.
