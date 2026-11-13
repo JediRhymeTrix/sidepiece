@@ -5,8 +5,15 @@ $root=Split-Path $PSScriptRoot -Parent
 $compiler=Join-Path ${env:ProgramFiles(x86)} 'Inno Setup 6\ISCC.exe'
 if(-not (Test-Path -LiteralPath $compiler) -or (Get-Item -LiteralPath $compiler).VersionInfo.FileVersion -notlike '6.4.3*'){
  if(-not $InstallCompiler){throw 'Install Inno Setup 6.4.3, or use -InstallCompiler on a disposable build runner.'}
- & choco install innosetup --version=6.4.3 --yes --no-progress --force --allow-downgrade
- if($LASTEXITCODE){throw 'Inno compiler installation failed'}
+ $download=Join-Path $env:TEMP ('innosetup-'+[guid]::NewGuid().ToString('N')+'.exe')
+ try{
+  Invoke-WebRequest 'https://github.com/jrsoftware/issrc/releases/download/is-6_4_3/innosetup-6.4.3.exe' -OutFile $download
+  if((Get-FileHash $download -Algorithm SHA256).Hash -ne 'F3C42116542C4CC57263C5BA6C4FEABFC49FE771F2F98A79D2F7628B8762723B'){throw 'Inno compiler checksum mismatch'}
+  if((Get-AuthenticodeSignature $download).Status -ne 'Valid'){throw 'Inno compiler signature invalid'}
+  $p=Start-Process $download -ArgumentList '/VERYSILENT /SUPPRESSMSGBOXES /NORESTART /SP-' -Wait -PassThru
+  try{if($p.ExitCode){throw 'Inno compiler installation failed'}}finally{$p.Dispose()}
+ }finally{if(Test-Path $download){Remove-Item -LiteralPath $download -Force}}
+ if(-not (Test-Path $compiler) -or (Get-Item $compiler).VersionInfo.FileVersion -notlike '6.4.3*'){throw 'Pinned Inno compiler not found after installation'}
 }
 $version=([IO.File]::ReadAllText((Join-Path $root 'VERSION'))).Trim()
 if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'Invalid version'}
