@@ -2,13 +2,15 @@
 [CmdletBinding()]
 param(
  [switch]$Install,
- [string]$InstallRoot=(Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'service'),
+ [string]$InstallRoot,
  [string]$DataRoot=(Join-Path $env:ProgramData 'GeForceSidepiece'),
- [string]$BinaryPath=(Join-Path (Split-Path $PSScriptRoot -Parent) 'sidepiece.exe'),
+ [string]$BinaryPath,
  [string]$SilentDeviceIds,
  [switch]$SmokeTest
 )
 $ErrorActionPreference='Stop'
+if(-not $InstallRoot){$InstallRoot=Join-Path (Split-Path (Split-Path $PSScriptRoot -Parent) -Parent) 'service'}
+if(-not $BinaryPath){$BinaryPath=Join-Path (Split-Path $PSScriptRoot -Parent) 'sidepiece.exe'}
 . (Join-Path $PSScriptRoot 'Gpu.ps1')
 $setup=Join-Path $PSScriptRoot 'Setup.ps1'
 if($SmokeTest -and (-not $Install -or $SilentDeviceIds)){throw 'Smoke test requires -Install without silent IDs and never installs anything.'}

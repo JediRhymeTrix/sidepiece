@@ -33,7 +33,7 @@ jobs:
       - run: ./scripts/Build-Installer.ps1 -InstallCompiler
       - name: Configurator UI construction smoke test
         shell: powershell
-        run: ./scripts/Configure.ps1 -Install -SmokeTest
+        run: powershell.exe -NoProfile -STA -File ./scripts/Configure.ps1 -Install -SmokeTest
       - shell: powershell
         run: ./scripts/Test-Installer.ps1
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
