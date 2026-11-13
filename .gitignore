@@ -1,0 +1,12 @@
+/build/
+/dist/
+/runtime/
+*.obj
+*.exe
+*.pdb
+*.ilk
+*.log
+route.key
+config.local.json
+backups/
+.vs/

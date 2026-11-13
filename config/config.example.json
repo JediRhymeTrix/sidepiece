@@ -1,0 +1,12 @@
+{
+  "schemaVersion": 1,
+  "enabled": true,
+  "whitelistDeviceIds": [],
+  "blacklistDeviceIds": [],
+  "whitelistEndpoints": ["getDispDrvrByDevid", "getDispDrvrDtlsByDevid"],
+  "blacklistEndpoints": [],
+  "rules": [
+    {"endpoint": "getDispDrvrByDevid", "method": "GET", "overrides": [{"field": "iLp", "from": "1", "to": "0"}]},
+    {"endpoint": "getDispDrvrDtlsByDevid", "method": "GET", "overrides": [{"field": "iLp", "from": "1", "to": "0"}]}
+  ]
+}

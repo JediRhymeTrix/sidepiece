@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="160" height="160" viewBox="0 0 160 160" role="img" aria-labelledby="title desc">
+ <title id="title">GeForce Sidepiece</title><desc id="desc">An external graphics card with a heart and a connected cable.</desc>
+ <rect width="160" height="160" rx="36" fill="#111827"/>
+ <rect x="24" y="40" width="112" height="76" rx="12" fill="none" stroke="#a3e635" stroke-width="6"/>
+ <path d="M47 71c0-12 18-15 23-4 5-11 23-8 23 4 0 12-23 28-23 28S47 83 47 71" fill="#a3e635"/>
+ <path d="M108 63v30m10-30v30M58 119v12h24v-12M24 80H13v52h28" fill="none" stroke="#a3e635" stroke-width="6" stroke-linecap="round"/>
+</svg>

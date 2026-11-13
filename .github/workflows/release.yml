@@ -1,0 +1,61 @@
+name: Release
+on:
+  push:
+    tags: ['v*']
+permissions:
+  contents: read
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  build:
+    runs-on: windows-2022
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Verify release version
+        run: |
+          $v=(Get-Content VERSION -Raw).Trim()
+          if($env:GITHUB_REF_NAME -ne ('v'+$v)){throw 'Tag/version mismatch'}
+      - run: ./scripts/Build.ps1 -Analyze
+      - run: ./scripts/Test-Lifecycle.ps1
+      - run: ./scripts/Test-Lifecycle.ps1 -Scm
+      - shell: powershell
+        run: ./scripts/Test-Setup.ps1
+      - run: ./scripts/Test-Setup.ps1
+      - run: ./scripts/Package.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: release-windows-x64
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: release-windows-x64
+          path: dist
+      - name: Publish verified assets with generated notes
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          cd dist
+          sha256sum --check SHA256SUMS.txt
+          printf '%s\n' 'Unofficial NVIDIA App desktop-eGPU metadata bridge.' '' 'Unsigned Windows x64 binaries. All 0.x releases are experimental prereleases. Synthetic/native SCM testing does not establish NVIDIA App GUI or broad hardware compatibility. See README and SECURITY.md before installation.' > "$RUNNER_TEMP/release-notes.txt"
+          options=()
+          if [[ "$RELEASE_TAG" == v0.* ]]; then options+=(--prerelease); fi
+          gh release create "$RELEASE_TAG" ./*.zip SHA256SUMS.txt --verify-tag --title "GeForce Sidepiece $RELEASE_TAG" --generate-notes --notes-file "$RUNNER_TEMP/release-notes.txt" "${options[@]}"

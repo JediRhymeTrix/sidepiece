@@ -1,0 +1,35 @@
+name: Bug or compatibility issue
+description: Report a reproducible Sidepiece issue without private runtime data.
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: Do not paste route keys, tokenized URLs, raw NVIDIA logs, runtime config or backups. For vulnerabilities use SECURITY.md.
+  - type: input
+    id: versions
+    attributes:
+      label: Versions
+      description: Sidepiece, Windows, NVIDIA App and driver versions.
+    validations:
+      required: true
+  - type: dropdown
+    id: host
+    attributes:
+      label: Hosting mode
+      options: [Native SCM service, Foreground, pdsvc or another manager]
+    validations:
+      required: true
+  - type: textarea
+    id: symptom
+    attributes:
+      label: Expected and actual behavior
+      description: GPU model/enclosure type and redacted validation results. No full hardware IDs needed.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: Minimal reproduction
+      description: Steps and synthetic examples only; distinguish API results from NVIDIA App UI behavior.
+    validations:
+      required: true

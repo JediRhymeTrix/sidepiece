@@ -1,0 +1,55 @@
+name: Windows CI
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  windows:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [windows-2022, windows-2025]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    defaults:
+      run:
+        shell: pwsh
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Parse PowerShell scripts
+        shell: powershell
+        run: |
+          Get-ChildItem scripts/*.ps1 | ForEach-Object {
+            $tokens=$null; $errors=$null
+            [void][Management.Automation.Language.Parser]::ParseFile($_.FullName,[ref]$tokens,[ref]$errors)
+            if($errors){throw ($errors | Out-String)}
+          }
+      - name: Build, static analysis and native tests
+        run: ./scripts/Build.ps1 -Analyze
+      - name: Foreground lifecycle fixture
+        run: ./scripts/Test-Lifecycle.ps1
+      - name: Native SCM fixture
+        run: ./scripts/Test-Lifecycle.ps1 -Scm
+      - name: Installer lifecycle fixture (Windows PowerShell 5.1)
+        shell: powershell
+        run: ./scripts/Test-Setup.ps1
+      - name: Installer lifecycle fixture (PowerShell 7)
+        run: ./scripts/Test-Setup.ps1
+      - name: Package
+        run: ./scripts/Package.ps1
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: sidepiece-${{ matrix.os }}
+          path: |
+            dist/*.zip
+            dist/SHA256SUMS.txt
+          if-no-files-found: error
+          retention-days: 14
