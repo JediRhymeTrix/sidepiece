@@ -15,8 +15,7 @@ if($InstallCompiler){
  }finally{if(Test-Path $download){Remove-Item -LiteralPath $download -Force}}
 }
 if(-not (Test-Path $compiler)){throw 'Install Inno Setup 6.4.3, or use -InstallCompiler on a disposable build runner.'}
-$banner=(& $compiler '/?'|Out-String)
-if($banner -notmatch '6\.4\.3'){throw ('Unexpected Inno compiler version: '+$banner)}
+if(-not $InstallCompiler -and (Get-Item $compiler).VersionInfo.ProductVersion -notlike '6.4.3*'){throw 'Install Inno Setup 6.4.3; the local compiler has a different product version.'}
 $version=([IO.File]::ReadAllText((Join-Path $root 'VERSION'))).Trim()
 if($version -notmatch '^\d+\.\d+\.\d+$'){throw 'Invalid version'}
 $payload=Join-Path $root 'build\installer-payload'
