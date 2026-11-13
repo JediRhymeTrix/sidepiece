@@ -23,21 +23,24 @@ CloseApplications=no
 RestartApplications=no
 UninstallDisplayName=GeForce Sidepiece
 SetupLogging=yes
+SetupMutex=Global\GeForceSidepiece.Setup
 [Files]
 Source: "..\build\installer-payload\*"; DestDir: "{tmp}\sidepiece-payload"; Flags: dontcopy recursesubdirs
 Source: "..\build\installer-payload\*"; DestDir: "{app}\payload"; Flags: ignoreversion recursesubdirs createallsubdirs
 [Icons]
-Name: "{commonprograms}\Configure GeForce Sidepiece"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -STA -WindowStyle Hidden -ExecutionPolicy Bypass -File ""{app}\payload\scripts\Configure.ps1"""; WorkingDir: "{app}"
+Name: "{commonprograms}\Configure GeForce Sidepiece"; Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -STA -ExecutionPolicy Bypass -File ""{app}\payload\scripts\Configure.ps1"""; WorkingDir: "{app}"
 [Code]
 var
   BackendAttempted, HadService, SetupCompleted: Boolean;
+function GetCurrentProcessId: LongWord;
+  external 'GetCurrentProcessId@kernel32.dll stdcall';
 function BackendParams(Base, Action: String): String;
 begin
   Result := '-NoProfile -STA -ExecutionPolicy Bypass -File "' + Base + '\scripts\Installer.ps1" -Action ' + Action + ' -InstallRoot "' + ExpandConstant('{app}') + '"';
 end;
 function PrepareToInstall(var NeedsRestart: Boolean): String;
 var
-  Code: Integer;
+  Code, ShowMode: Integer;
   Args, Gpus: String;
 begin
   Result := '';
@@ -51,11 +54,16 @@ begin
     end;
     Args := Args + ' -DeviceIds "' + Gpus + '"';
   end;
-  if WizardSilent then Args := Args + ' -Silent';
+  ShowMode := SW_SHOWNORMAL;
+  if WizardSilent then begin
+    Args := Args + ' -Silent';
+    ShowMode := SW_HIDE;
+  end else
+    Args := Args + ' -OwnerWindow ' + IntToStr(WizardForm.Handle) + ' -OwnerProcessId ' + IntToStr(GetCurrentProcessId);
   if not BackendAttempted then
     HadService := RegKeyExists(HKLM, 'SYSTEM\CurrentControlSet\Services\GeForceSidepiece');
   BackendAttempted := True;
-  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, Code) then
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', ShowMode, ewWaitUntilTerminated, Code) then
     Result := 'Unable to launch Windows PowerShell setup.'
   else if Code <> 0 then
     Result := 'Service setup was cancelled or refused. Check NVIDIA App, existing bridges, port 80 and retained recovery data. No successful installation is claimed.';
@@ -85,13 +93,18 @@ begin
 end;
 procedure CurUninstallStepChanged(CurUninstallStep: TUninstallStep);
 var
-  Code: Integer;
+  Code, ShowMode: Integer;
   Args: String;
 begin
   if CurUninstallStep <> usUninstall then Exit;
   Args := BackendParams(ExpandConstant('{app}\payload'), 'Uninstall');
-  if UninstallSilent then Args := Args + ' -Silent';
-  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', SW_HIDE, ewWaitUntilTerminated, Code) then
+  ShowMode := SW_SHOWNORMAL;
+  if UninstallSilent then begin
+    Args := Args + ' -Silent';
+    ShowMode := SW_HIDE;
+  end else
+    Args := Args + ' -OwnerWindow ' + IntToStr(UninstallProgressForm.Handle) + ' -OwnerProcessId ' + IntToStr(GetCurrentProcessId);
+  if not Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'), Args, '', ShowMode, ewWaitUntilTerminated, Code) then
     RaiseException('Unable to launch safe service removal; files retained.');
   if Code <> 0 then
     RaiseException('Could not safely restore/remove the service. Files and recovery data retained. Resolve the restore error before uninstalling.');
