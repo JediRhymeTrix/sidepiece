@@ -6,6 +6,11 @@ $nv=Join-Path $env:ProgramData 'NVIDIA Corporation\NVIDIA App'
 $install=Join-Path $env:ProgramFiles ('SidepieceFixture-'+[guid]::NewGuid().ToString('N'))
 $data=Join-Path $env:ProgramData ('SidepieceFixture-'+[guid]::NewGuid().ToString('N'))
 if((Test-Path -LiteralPath $nv) -or (Get-Service GeForceSidepiece -ErrorAction SilentlyContinue)){throw 'Refusing existing NVIDIA settings or service; runner must be clean.'}
+# Hosted Windows images may have IIS bound to HTTP port 80. Never do this on user machines.
+foreach($webService in 'W3SVC','WAS'){
+ $web=Get-Service $webService -ErrorAction SilentlyContinue
+ if($web -and $web.Status -ne 'Stopped'){Stop-Service $webService -Force}
+}
 $setup=Join-Path $PSScriptRoot 'Setup.ps1'
 $binary=Join-Path $root 'build\sidepiece.exe'
 $loc=Join-Path $nv 'NvConfig\LocalizedConfig.json'
