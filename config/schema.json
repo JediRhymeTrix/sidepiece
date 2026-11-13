@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/JediRhymeTrix/sidepiece/main/config/schema.json",
+  "title": "GeForce Sidepiece configuration",
+  "description": "Runtime additionally enforces unique endpoint/method pairs and unique override fields; total file size is limited to 64 KiB.",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schemaVersion", "rules"],
+  "properties": {
+    "schemaVersion": {"const": 1},
+    "enabled": {"type": "boolean", "default": false},
+    "whitelistDeviceIds": {"$ref": "#/$defs/devices"},
+    "blacklistDeviceIds": {"$ref": "#/$defs/devices"},
+    "whitelistEndpoints": {"$ref": "#/$defs/endpoints"},
+    "blacklistEndpoints": {"$ref": "#/$defs/endpoints"},
+    "rules": {
+      "type": "array", "maxItems": 64,
+      "items": {
+        "type": "object", "additionalProperties": false,
+        "required": ["endpoint", "method", "overrides"],
+        "properties": {
+          "endpoint": {"$ref": "#/$defs/endpoint"},
+          "method": {"const": "GET"},
+          "overrides": {
+            "type": "array", "minItems": 1, "maxItems": 16,
+            "items": {
+              "type": "object", "additionalProperties": false,
+              "required": ["field", "from", "to"],
+              "properties": {
+                "field": {"type": "string", "minLength": 1, "maxLength": 128, "not": {"const": "dIDa"}},
+                "from": {"$ref": "#/$defs/scalar"},
+                "to": {"$ref": "#/$defs/scalar"}
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "$defs": {
+    "devices": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"type": "string", "minLength": 21, "maxLength": 40, "pattern": "^[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9A-F]{4}_[0-9]+$"}},
+    "endpoint": {"type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[A-Za-z0-9_]+$"},
+    "endpoints": {"type": "array", "maxItems": 64, "uniqueItems": true, "items": {"$ref": "#/$defs/endpoint"}},
+    "scalar": {"type": ["string", "number", "boolean", "null"], "description": "Serialized JSON scalar is limited to 1024 bytes; matching is exact JSON token text, not coercion."}
+  }
+}
